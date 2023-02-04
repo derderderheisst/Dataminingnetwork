@@ -40,12 +40,12 @@
 #include <math.h>
 
 // Contiki-specific includes:
-
 #include "contiki.h"
 #include "net/rime/rime.h"     // Establish connections.
 #include "net/netstack.h"      // Wireless-stack definitions
 #include "sys/energest.h"
 #include "dev/watchdog.h"
+
 #include "dev/button-sensor.h" // User Button
 #include "dev/serial-line.h"
 
@@ -67,6 +67,7 @@
 
 /*---------------------------Variables----------------------------------------*/
 
+
 static uint8_t current_phase;		 // 0 : Node discovery phase, 1 : Routing phase, 2: Sensor data sending phase, 3: Failure recovery phase, 4:New addition phase for a new node,
 									// 6 : Failed State
 static bool discovery_broadcast_done;
@@ -84,7 +85,9 @@ static unsigned short dist_to_gateway = 9999;
 static uint8_t curr_route;
 
 static unsigned short **adjmx;
+static double ** reset_var;
 static unsigned int *sensordata_times;
+static uint8_t *node_status_vals;
 
 static struct etimer packet_delay_timer;
 static neighbor_data neighbors[MAX_NEIGHBORS];
@@ -95,6 +98,9 @@ static struct ctimer send_routing_info_timer;
 static struct ctimer check_node_alive_timer;
 static struct ctimer beacon_send_timer;
 static struct ctimer reconnect_broadcast_send_timer;
+static struct ctimer reset_timer;
+
+
 static uint8_t led_color;	        // Each id has unique led color. When this
                                     // node generates a packet, it has this led
                                     //color.
@@ -114,6 +120,39 @@ PROCESS(sensor_process_gateway, "Receive the periodically sent sensor data from 
 //PROCESS(destination_reaced_process, "Process indicate a packets has reached its"
 //		" destination");
 AUTOSTART_PROCESSES(&routing_process);
+
+// Function prototypes:
+static void configure_node_sensors();
+static sensordata_packet create_sensor_packet();
+static void buzzer_update(sensordata_packet spacket);
+static unsigned short rssi_to_cost(int16_t rssi);
+static void checkAddNeighbor(discovery_packet disc_packet);
+static void checkAddNeighbor_withDist(discovery_packet disc_packet);
+static void send_global_reset();
+static void reset_callback(void *data);
+static void send_newnode_msg();
+static void print_neighbors_table(neighbor_data nbors[], uint8_t n);
+static int getIdFromNodelist(linkaddr_t addr);
+static void update_adjacency_matrix(neighbor_data nbors[], linkaddr_t src, uint8_t n, uint8_t resetCost);
+static void print_adjacency_matrix();
+static void print_binary_adjacency_matrix();
+static void print_nodelist();
+static void print_sensor_data(sensordata_packet s);
+static void check_node_alive_callback(void *data);
+static void print_node_status();
+static void beacon_send_callback(void *data);
+static routing_paths_packet create_route_packet();
+static void send_routing_info_callback(void *data);
+static void compute_dijkstra_routing();
+static void compute_routing_callback(void *data);
+static void reconnect_broadcast_send_callback(void *data);
+static void send_discovery_broadcast();
+static void send_neighbor_data();
+static void send_sensor_data_packet(sensordata_packet spacket);
+static void add_new_node_in_gateway(newnode_data_packet npacket);
+static void propagate_dist_to_tailnodes(int distance);
+static void propagate_failure();
+static void find_best_node_connect();
 
 //-----------------// Sensors:
 static void configure_node_sensors(){
@@ -137,21 +176,21 @@ static void buzzer_update(sensordata_packet spacket){
 	if(spacket.vibration_val < 500)
 	{
 		GPIO_SET_PIN(GPIO_C_BASE, 0x08);
-		clock_delay(2*CLOCK_SECOND);
-		GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
+		//clock_delay(2*CLOCK_SECOND);
+		//GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
 
 	}
 	else if(spacket.tempval > 40000 )
 	{
 		GPIO_SET_PIN(GPIO_C_BASE, 0x08);
-		clock_delay(3*CLOCK_SECOND);
-		GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
+		//clock_delay(3*CLOCK_SECOND);
+		//GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
 	}
 	else if(spacket.mvoltval < 1000)
 	{
 		GPIO_SET_PIN(GPIO_C_BASE, 0x08);
-		clock_delay(3*CLOCK_SECOND);
-		GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
+		//clock_delay(3*CLOCK_SECOND);
+		//GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
 	}
 	else
 		GPIO_CLR_PIN(GPIO_C_BASE, 0x08);
@@ -218,6 +257,19 @@ static void checkAddNeighbor_withDist(discovery_packet disc_packet){
 //	printf("\n");
 
 }
+static void send_global_reset(){
+	discovery_packet resetpacket;
+	resetpacket.disc_type = 9; // Reset packet
+	packetbuf_copyfrom(&resetpacket,sizeof(discovery_packet));
+	broadcast_send(&broadcast);
+}
+
+static void reset_callback(void *data){
+	watchdog_reboot();
+	printf("reset error\n");
+}
+
+
 static void send_newnode_msg(){
 	newnode_data_packet ndpacket;
 	linkaddr_copy(&ndpacket.src, &linkaddr_node_addr);
@@ -258,11 +310,20 @@ static int getIdFromNodelist(linkaddr_t addr){
 }
 
 
-static void update_adjacency_matrix(neighbor_data nbors[], linkaddr_t src, uint8_t n){
+static void update_adjacency_matrix(neighbor_data nbors[], linkaddr_t src, uint8_t n, uint8_t resetCost){
+	// n: num of neighbors, resetCost: "1" means we reset the cost value with the new data,
+	// "0" means we take the average of the new and old values if a previous value exists for a connection
+
 	// Get the source node id from nodelist and add its address to the nodelist if it is not added yet.
 	int src_id = getIdFromNodelist(src);
 	int neigh_id;
 	int curr_cost;
+	if(resetCost == 1){ // Reset the previous cost values for this node index to 0, then enter costs based on received nbors list
+		for(int i=0;i<num_total_nodes;i++){
+			adjmx[src_id][i] = 0;
+			adjmx[i][src_id] = 0;
+		}
+	}
 	// Loop over the neighbors list of the node
 	for(int i=0;i<n;i++){
 		neigh_id = getIdFromNodelist(nbors[i].addr);
@@ -276,6 +337,8 @@ static void update_adjacency_matrix(neighbor_data nbors[], linkaddr_t src, uint8
 	}
 }
 
+
+
 static void print_adjacency_matrix(){
 	int y, x;
 	printf("\n");
@@ -287,12 +350,36 @@ static void print_adjacency_matrix(){
 	    {
 	         printf(",%d", adjmx[y][x]);
 	    }
-	    printf(";");
+	    printf(";"); //!DEL!!MOD!
+	    //printf("\n");
 	}
 	printf("\n");
 }
 
-
+static void print_binary_adjacency_matrix(){
+	int y, x;
+	printf("\n");
+	printf("routingdata:adjmx = ");
+	for (y=0; y<num_total_nodes; y++)
+	{
+    	if(adjmx[y][0] == 0){
+    		 printf("0");
+    	}else{
+    		 printf("1");
+    	}
+	    for(x=1; x<num_total_nodes; x++)
+	    {
+	    	if(adjmx[y][x] == 0){
+	    		 printf(",0");
+	    	}else{
+	    		 printf(",1");
+	    	}
+	    }
+	    printf(";"); //!DEL!!MOD!
+	    //printf("\n");
+	}
+	printf("\n");
+}
 static void print_nodelist(){
 	 // Print the nodelist
 	 printf("\nroutingdata:nodelist = 0x%x%x",nodelist[0].u8[0], nodelist[0].u8[1]);
@@ -320,25 +407,25 @@ static void check_node_alive_callback(void *data){
 	for(int i = 0;i<num_total_nodes-1;i++){
 		delay = clock_seconds() - sensordata_times[i];
 		if(delay > ALIVE_MAX_NODE_DELAY){
+			node_status_vals[i] = 1; // "1" means the node is down
 			printf("\nstatus:nodedown:%d\n",i+1);
 			//printf("Node %d is dead ! No signal for %d seconds\n",i+1,delay);
-			// TODO: Call function for failure recovery
-			// fail_recovery();
 		}
 	}
-	// Set up the timer again (if everything is ok)
-	// Reset the timer only after failure recovery if there is a problem
+	// Set up the timer again, Reset the timer
 	ctimer_reset(&check_node_alive_timer);
 }
-static void sensordata_times_reset(){
+static void print_node_status(){
 	for(int i = 0;i<num_total_nodes-1;i++){
-		sensordata_times[i] = clock_seconds();
+		if(node_status_vals[i] == 1){
+			printf("\nstatus:nodedown:%d\n",i+1);
+		}
 	}
 }
 
 static void beacon_send_callback(void *data){
 	// Send a beacon broadcast from each node periodically to discover nodes that are newly added to the network
-	leds_on(LEDS_RED);
+
 	discovery_packet dpacket;
 	linkaddr_copy(&dpacket.src, &linkaddr_node_addr);
 	dpacket.src_dist_to_gateway = dist_to_gateway;
@@ -347,7 +434,6 @@ static void beacon_send_callback(void *data){
 	broadcast_send(&broadcast);
 	//printf("Beacon broadcast message sent.\n");
 	ctimer_reset(&beacon_send_timer);
-	leds_off(LEDS_RED);
 
 }
 
@@ -464,7 +550,7 @@ static void compute_routing_callback(void *data){
 
 	// First print some node information:
 	printf("routingdata:num_total_nodes = %d\n", num_total_nodes);
-	print_adjacency_matrix();
+	print_adjacency_matrix(); //!DEL!
 	print_nodelist();
 
 	// Returns previous node id to reach each node (saves it to the static array "prev_nodes").
@@ -484,20 +570,23 @@ static void compute_routing_callback(void *data){
 	}
 }
 static void reconnect_broadcast_send_callback(void *data){
-	leds_off(LEDS_ALL);
-	leds_on(LEDS_BLUE);
+	//leds_off(LEDS_ALL);
+	//leds_on(LEDS_BLUE);
 	node_dists = malloc(MAX_NEIGHBORS * sizeof(unsigned short));
+	num_neighbors = 0; // Reset the number of neighbors and therefore the neighbors list for re-discovery
 	discovery_packet tx_disc_packet;
 	linkaddr_copy(&tx_disc_packet.src, &linkaddr_node_addr);
 	tx_disc_packet.disc_type = 2;
 	tx_disc_packet.src_dist_to_gateway = 9999;
 	packetbuf_copyfrom(&tx_disc_packet, sizeof(discovery_packet));
 	broadcast_send(&broadcast);
-	etimer_set(&discovery_finished_timer, CLOCK_SECOND);
+	printf("Sent reconnect broadcast\n"); //!DEL!
+	// Post to process to set up timer to wait for the replies from nodes to reconnect
+	// Process after this point for failure recovery is the same as adding a new node
+	process_post(&routing_process,PROCESS_EVENT_MSG,0);
 }
 
 static void send_discovery_broadcast(){
-	leds_on(LEDS_RED);
 	discovery_packet tx_disc_packet;
 	linkaddr_copy(&tx_disc_packet.src, &linkaddr_node_addr);
 	tx_disc_packet.disc_type = 0; // Initial network discovery
@@ -505,7 +594,6 @@ static void send_discovery_broadcast(){
 	broadcast_send(&broadcast);
 	printf("Broadcast message sent.\n");
 	discovery_broadcast_done = true;
-	leds_off(LEDS_RED);
 }
 
 static void send_neighbor_data(){
@@ -522,6 +610,7 @@ static void send_neighbor_data(){
 	// or it is the gateway because of the delays in broadcasts.
 	runicast_send(&runicast, &neighbors[0].addr, RUNICAST_MAX_RETRANSMIT); // Resend max 2 times
 	printf("Neighbor data sent.\n");
+	print_neighbors_table(neighbors,num_neighbors);//!DEL!
 }
 
 static void send_sensor_data_packet(sensordata_packet spacket){
@@ -529,7 +618,7 @@ static void send_sensor_data_packet(sensordata_packet spacket){
 	wpacket.msgtype = 2; // Sensor data packet type
 	wpacket.msg.s = spacket;
 	packetbuf_copyfrom(&wpacket, sizeof(wrapper_packet));
-	printf("Temperature: %d mC\nVibration: %d\nBattery Voltage: %u mV\n\n", spacket.tempval, spacket.vibration_val, spacket.mvoltval);
+	//printf("Temperature: %d mC\nVibration: %d\nBattery Voltage: %u mV\n\n", spacket.tempval, spacket.vibration_val, spacket.mvoltval);
 	printf("Sensor data sent to 0x%x%x.\n",active_nlist[0].u8[0],active_nlist[0].u8[1]);
 	runicast_send(&runicast, &active_nlist[0],RUNICAST_MAX_RETRANSMIT);
 }
@@ -541,7 +630,18 @@ static void add_new_node_in_gateway(newnode_data_packet npacket){
 	node_id = getIdFromNodelist(npacket.src);
 	//print_neighbors_table(npacket.ntable, npacket.num_neighbors);
 
-	update_adjacency_matrix(npacket.ntable, npacket.src, npacket.num_neighbors);
+	if(node_id != num_total_nodes-1){ // If this is a reconnected node
+		// Update the status of that node, and reset its timeout timer
+		node_status_vals[node_id-1] = 0;
+		sensordata_times[node_id-1] = clock_seconds();
+	}else{
+		// If this is a newly added node:
+		node_status_vals[node_id-1] = 0;
+		sensordata_times[node_id-1] = clock_seconds();
+	}
+	update_adjacency_matrix(npacket.ntable, npacket.src, npacket.num_neighbors, 1);
+	// "1" here means to reset the cost if a previous cost for a connection exists. This is useful for reconnections
+	// since the neighbors might not be the same after reconnection
 
 	// Update prev nodes array
 	int prev_id = getIdFromNodelist(npacket.conn_addr);
@@ -558,7 +658,8 @@ static void add_new_node_in_gateway(newnode_data_packet npacket){
 	for (int i = 1; i < num_total_nodes; i++)
 		printf(",%d",prev_nodes[i]);
 	printf("\n");
-	sensordata_times_reset();
+	print_node_status();
+	//sensordata_times_reset();
 	//check_node_alive_callback(NULL);
 }
 static void propagate_dist_to_tailnodes(int distance){
@@ -578,7 +679,18 @@ static void propagate_dist_to_tailnodes(int distance){
 		runicast_send(&runicast,&active_nlist[i] ,RUNICAST_MAX_RETRANSMIT);
 	}
 }
-
+static void propagate_failure(){
+	if(num_active_neighbors <= 1){
+			return; // If no tail nodes, just return
+	}
+	wrapper_packet fail_prop_packet;
+	fail_prop_packet.msgtype = 6; // Set as a failure propagation message
+	packetbuf_copyfrom(&fail_prop_packet, sizeof(wrapper_packet));
+	// Send to child nodes via runicast
+	for(int i=1;i<num_active_neighbors;i++){
+		runicast_send(&runicast,&active_nlist[i] ,RUNICAST_MAX_RETRANSMIT);
+	}
+}
 static void find_best_node_connect(){
 	int min_dist = 9999;
 	uint8_t min_ind;
@@ -591,12 +703,17 @@ static void find_best_node_connect(){
 	if(min_dist>=9999){
 		printf("No nodes found to connect to !\n");
 		current_phase = 6;
+		leds_off(LEDS_ALL);
+		leds_on(LEDS_RED);
+		propagate_failure();
+		num_active_neighbors = 0; // No active neighbors since node is in failed state
 	}else{
 		// Connect:
 		linkaddr_copy(&active_nlist[0], &neighbors[min_ind].addr);
+		printf("Num neighbors : %d\nNode found to connect: 0x%x%x.\n",num_neighbors,active_nlist[0].u8[0],active_nlist[0].u8[1]);//!DEL!
 		send_newnode_msg();
-		// No need to recalculate distance from rssi, add fix 100 as cost;
-		dist_to_gateway = min_dist + 100;
+		// Calculate the distance of the current node;
+		dist_to_gateway = min_dist + rssi_to_cost(neighbors[min_ind].rssi);
 		propagate_dist_to_tailnodes(dist_to_gateway);
 		// Start sensor data sending phase
 		current_phase = 2;
@@ -645,6 +762,10 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
 				printf("Low RSSI signal, not considered a neighbor!\n");
 				return;
 			}
+			// Exit if beacon is coming from a disconnected node:
+			if(rx_disc_packet.src_dist_to_gateway > 9900){
+				return;
+			}
 			current_phase = 4; // New addition phase for a new node
 			leds_off(LEDS_ALL);
 			leds_on(LEDS_BLUE);
@@ -681,11 +802,56 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
 			wpacket.msgtype = 3;
 			wpacket.msg.d = tx_dpacket;
 			packetbuf_copyfrom(&wpacket, sizeof(wrapper_packet));
-			runicast_send(&runicast, &rx_disc_packet.src,RUNICAST_MAX_RETRANSMIT);
+			runicast_send(&runicast, &rx_disc_packet.src, RUNICAST_MAX_RETRANSMIT);
+			//printf("Received discovery msg\n");//!DEL!
+		}else if(rx_disc_packet.disc_type == 9) {//RESET PACKET
+			send_global_reset();
+			current_phase = 6;
+			ctimer_set(&reset_timer,CLOCK_SECOND,&reset_callback,NULL);
+			printf("reset error!!\n");
+		}
+	} // If node is in failed state, listen for beacons for an opportunity to reconnect
+	else if(current_phase == 6){
+		discovery_packet rx_disc_packet;
+		packetbuf_copyto(&rx_disc_packet);
+		if(rx_disc_packet.disc_type == 1){
+			// Check if it can be considered a neighbor by RSSI limit, ignore the packet if RSSI is lower than min
+			if((int16_t)packetbuf_attr(PACKETBUF_ATTR_RSSI) < MIN_NEIGHBOR_RSSI){
+				printf("Low RSSI signal, not considered a neighbor!\n");
+				return;
+			}
+			// Exit if beacon is coming from a disconnected node:
+			if(rx_disc_packet.src_dist_to_gateway > 9900){
+				return;
+			}
+			current_phase = 4; // New addition phase for a new node
+			leds_off(LEDS_ALL);
+			leds_on(LEDS_BLUE);
+			node_dists = malloc(MAX_NEIGHBORS * sizeof(unsigned short));
+			discovery_packet tx_disc_packet;
+			linkaddr_copy(&tx_disc_packet.src, &linkaddr_node_addr);
+			tx_disc_packet.disc_type = 2;
+			tx_disc_packet.src_dist_to_gateway = 9999;
+			packetbuf_copyfrom(&tx_disc_packet, sizeof(discovery_packet));
+			broadcast_send(&broadcast);
+
+			// Post to the process, set a timer there to wait for runicast responses,
+			// and after it expires, find the best node and connect
+			process_post(&routing_process,PROCESS_EVENT_MSG,0);
+		}
+	}
+	else{
+		discovery_packet rx_disc_packet;
+		packetbuf_copyto(&rx_disc_packet);
+		if(rx_disc_packet.disc_type == 9){ // RESET PACKET
+			printf("GLOBAL RESET !\n");
+			send_global_reset();
+			current_phase = 6;
+			ctimer_set(&reset_timer,0.5*CLOCK_SECOND,&reset_callback,NULL);
 		}
 
 	}
-	 // TODO: Add check responses
+	// TODO: Add check responses
 }
 
 
@@ -746,8 +912,8 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 			//printf("Gateway received neighbor table from 0x%x%x\n",npacket.src.u8[0],npacket.src.u8[1]);
 			//print_neighbors_table(npacket.ntable, npacket.num_neighbors);
 
-			update_adjacency_matrix(npacket.ntable, npacket.src, npacket.num_neighbors);
-			//print_adjacency_matrix();
+			update_adjacency_matrix(npacket.ntable, npacket.src, npacket.num_neighbors, 0); // 0 means to average the cost if a previous value exists
+			// print_adjacency_matrix();
 			// print_nodelist();
 			// Set callback timer to end waiting for neighbor data packets, and calculate the optimal routes in the callback function
 			process_post(&routing_process,PROCESS_EVENT_MSG,1); // Post with data = 1
@@ -769,7 +935,7 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 			memcpy(active_nlist, rpacket.nlist, sizeof(active_nlist));
 			num_active_neighbors =	rpacket.num_active_neighbors;
 			dist_to_gateway = rpacket.cost_to_gateway;
-
+			printf("Dist to gateway = %d\n",dist_to_gateway); //!DEL!
 			node_ind = rpacket.node_index;
 			//					printf("Next node to gateway is 0x%x%x \nNum. of active neighbors: %d \nLast neighbor addr:  0x%x%x \n",
 			//												rpacket.nlist[0].u8[0],rpacket.nlist[0].u8[1], rpacket.num_active_neighbors,
@@ -817,9 +983,11 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 		// If this is a discovery response runicast for a node to be newly added to an established network
 	}else if(rx_packet.msgtype == 3){
 		discovery_packet dpacket = rx_packet.msg.d;
+		//printf("Connection broadcast response received from 0x%x%x\n",dpacket.src.u8[0],dpacket.src.u8[1]);//!DEL!
+
 		checkAddNeighbor_withDist(dpacket);
 	}
-	//
+	// If this is a message to inform the neighbor node and the gateway about the newly added node
 	else if(rx_packet.msgtype == 4){
 		if(isGateway){
 			add_new_node_in_gateway(rx_packet.msg.newnode);
@@ -840,6 +1008,25 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 		int16_t msg_rssi = (int16_t)packetbuf_attr(PACKETBUF_ATTR_RSSI);
 		dist_to_gateway = rx_packet.msg.ud.dist + rssi_to_cost(msg_rssi);
 		propagate_dist_to_tailnodes(dist_to_gateway);
+		if(dist_to_gateway > 9900){
+			leds_off(LEDS_ALL);
+			leds_on(LEDS_RED);
+		}
+	}
+	// If this is a failure propagation message
+	else if(rx_packet.msgtype == 6){
+		if(current_phase == 2){
+			// Initiate the failure recovery process from this node:
+			current_phase = 3; // Switched to failure recovery phase
+			num_active_neighbors = 0; // No active neighbors since connection failed
+			leds_off(LEDS_ALL);
+			leds_on(LEDS_RED);
+			// Send a discovery broadcast to find a new path
+			// End the sensor data sending process
+			printf("\nReceived failure propagation msg \n");//!DEL!
+			process_exit(&sensor_data_sending_process);
+			reconnect_broadcast_send_callback(NULL);
+		}
 	}
 }
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions){
@@ -847,20 +1034,21 @@ static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t
 }
 
 static void timedout_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions){
-	printf("ERROR: runicast message timed out when sending to %d.%d, retransmissions %d\n", to->u8[0], to->u8[1], retransmissions);
-	if(current_phase == 2){
-		dist_to_gateway = 9999;
-		current_phase = 3; // Switched to failure recovery phase
-		propagate_dist_to_tailnodes(9999);
-		//process_exit(&sensor_data_sending_process);
-		// Set up a timer to wait for the dist propagation to complete, and then send a discovery broadcast.
-		// Need to process post to set up the timer, then end the sensor data sending process
-		process_post(&sensor_data_sending_process,PROCESS_EVENT_MSG,0);
-		//TODO: Failure recovery
+	printf("ERROR: runicast message timed out when sending to 0x%x%x, retransmissions %d\n", to->u8[0], to->u8[1], retransmissions);
+	if((current_phase == 2) && (!isGateway)){
+		if(linkaddr_cmp(&active_nlist[0],to)){ // Only if the error is coming from a connection to next node on the way to the gateway
+			leds_off(LEDS_ALL);
+			leds_on(LEDS_RED);
+			dist_to_gateway = 9999;
+			current_phase = 3; // Switched to failure recovery phase
+			propagate_dist_to_tailnodes(9999);
+			// Set up a timer to wait for the dist propagation to complete, and then send a discovery broadcast.
+			// Need to process post to set up the timer, then end the sensor data sending process
+			process_post(&sensor_data_sending_process,PROCESS_EVENT_MSG,0);
 
+		}
 	}
-	leds_off(LEDS_ALL);
-	leds_on(LEDS_RED);
+
 }
 
 // Defines the functions used as callbacks for connections.
@@ -900,7 +1088,7 @@ PROCESS_THREAD(routing_process, ev, data) {
 	current_phase = 0; // Start with the discovery phase
 	leds_off(LEDS_ALL);
 	leds_on(23);
-
+	GPIO_SET_OUTPUT(GPIO_C_BASE, 0x08);
 
 	discovery_broadcast_done = false;
 	num_neighbors = 0;
@@ -910,8 +1098,9 @@ PROCESS_THREAD(routing_process, ev, data) {
 
 		if(ev == PROCESS_EVENT_MSG){
 			if(data == 0){
-				if(current_phase == 4){ // Set a timer to wait for runicast responses,
+				if((current_phase == 4) || (current_phase == 3)){ // Set a timer to wait for runicast responses,
 					// and after it expires, find the best node and connect
+					// If adding a new node, or reconnecting to another node in failure recovery
 					etimer_set(&discovery_finished_timer, CLOCK_SECOND);
 
 				}
@@ -922,7 +1111,7 @@ PROCESS_THREAD(routing_process, ev, data) {
 			}
 			else if(data == 1){ // GATEWAY ONLY
 				// Set timer to end waiting for neighbor data packets
-				ctimer_set(&compute_routing_timer,5*CLOCK_SECOND,compute_routing_callback, NULL);
+				ctimer_set(&compute_routing_timer,3*CLOCK_SECOND,compute_routing_callback, NULL);
 			}
 		}
 		else if(ev == PROCESS_EVENT_TIMER){
@@ -933,10 +1122,9 @@ PROCESS_THREAD(routing_process, ev, data) {
 				// Set the timer for the end of discovery process for this node
 				etimer_set(&discovery_finished_timer, 1.5*CLOCK_SECOND);
 			} else if(etimer_expired(&discovery_finished_timer)){
-				if(current_phase == 4){// Find the best node from the data in received runicast messages and connect to connect the new node
-					find_best_node_connect();
-				}
-				else if(current_phase == 3){// Find the best node from the data in received runicast messages and connect for failure recovery
+				//printf("Discovery fin. timer expired \n\n");//!DEL!/
+				if((current_phase == 4) || (current_phase == 3)){// Find the best node from the data in received runicast messages and connect
+					// to connect the new node or reconnect to a new node in failure recovery
 					find_best_node_connect();
 				}
 				else{
@@ -960,31 +1148,39 @@ PROCESS_THREAD(routing_process, ev, data) {
 			{
 				if( button_sensor.value(BUTTON_SENSOR_VALUE_TYPE_LEVEL) ==
 						BUTTON_SENSOR_PRESSED_LEVEL ) {
-
-					// Set up as gateway and generate first discovery packet:
-					isGateway = true;
-					dist_to_gateway = 0;
-					// First node in the nodelist is the gateway itself
-					linkaddr_copy(&nodelist[0], &linkaddr_node_addr);
-					num_total_nodes = 1;
-					send_discovery_broadcast();
-					discovery_broadcast_done = true;
-					// Allocate memory for the adjacency matrix only for the gateway			}
-					adjmx = calloc(MAX_NODES, sizeof(unsigned short *));
-					for (int i = 0; i < MAX_NODES; i++){
-						adjmx[i] = calloc(MAX_NODES, sizeof(unsigned short));
+					if(current_phase == 0){
+						// Set up as gateway and generate first discovery packet:
+						isGateway = true;
+						dist_to_gateway = 0;
+						// First node in the nodelist is the gateway itself
+						linkaddr_copy(&nodelist[0], &linkaddr_node_addr);
+						num_total_nodes = 1;
+						send_discovery_broadcast();
+						discovery_broadcast_done = true;
+						// Allocate memory for the adjacency matrix only for the gateway			}
+						adjmx = calloc(MAX_NODES, sizeof(unsigned short *));
+						for (int i = 0; i < MAX_NODES; i++){
+							adjmx[i] = calloc(MAX_NODES, sizeof(unsigned short));
+						}
+						num_total_nodes = MAX_NODES;
+						//print_adjacency_matrix();
+						num_total_nodes = 1;
+						printf("status:ndisc\n");
+						// Set the timer for the end of discovery process for the gateway node
+						etimer_set(&discovery_finished_timer, 1.5*CLOCK_SECOND);
+					}else if(current_phase == 2){
+						if(isGateway){
+							printf("GLOBAL RESET !\n");
+							current_phase = 6;
+							send_global_reset();
+							current_phase = 6;
+							ctimer_set(&reset_timer,0.5*CLOCK_SECOND,&reset_callback,NULL);
+						}
 					}
-					num_total_nodes = MAX_NODES;
-					//print_adjacency_matrix();
-					num_total_nodes = 1;
-					printf("status:ndisc\n");
-					// Set the timer for the end of discovery process for the gateway node
-					etimer_set(&discovery_finished_timer, 1.5*CLOCK_SECOND);
-
 				}
 			}
 		}else if(ev == serial_line_event_message){
-			//if(!strcmp(data,"start")){
+			if(!strcmp(data,"start")){
 				// Set up as gateway and generate first discovery packet:
 				isGateway = true;
 				dist_to_gateway = 0;
@@ -1001,16 +1197,20 @@ PROCESS_THREAD(routing_process, ev, data) {
 				num_total_nodes = MAX_NODES;
 				//print_adjacency_matrix();
 				printf("status:ndisc\n");
-				printf("reboot\n");
-				watchdog_reboot();
 				num_total_nodes = 1;
 				// Set the timer for the end of discovery process for the gateway node
 				etimer_set(&discovery_finished_timer, 1.5*CLOCK_SECOND);
+			}
+			else if(!strcmp(data,"reset")){
 
-			//}
+				printf("GLOBAL RESET !\n");
+				current_phase = 6;
+				send_global_reset();
+				current_phase = 6;
+				ctimer_set(&reset_timer,0.5*CLOCK_SECOND,&reset_callback,NULL);
+			}
 		}
 	}
-
 	PROCESS_END();
 }
 
@@ -1034,8 +1234,16 @@ PROCESS_THREAD(sensor_data_sending_process, ev, data) {
 //				// Get the sensor data, form it into a packet and send it
 				sensordata_packet tx_spacket;
 				tx_spacket = create_sensor_packet();
+				buzzer_update(tx_spacket);  // Buzz the buzzer in the sensor mote
 				send_sensor_data_packet(tx_spacket);
-
+				// Update the LED based on current distance
+				if(dist_to_gateway < 9990){
+					leds_off(LEDS_ALL);
+					leds_on(LEDS_GREEN);
+				}else{
+					leds_off(LEDS_ALL);
+					leds_on(LEDS_RED);
+				}
 				// Reset the timer
 				etimer_reset(&sensor_send_timer);
 			}
@@ -1045,6 +1253,7 @@ PROCESS_THREAD(sensor_data_sending_process, ev, data) {
 				if(current_phase == 3){ // If failure recovery process
 					// Set up a timer to wait for the infinity distance to propagate towards tail,
 					// then send a broadcast like we are adding a new node
+					printf("Reconnect timer set\n"); //!DEL!
 					ctimer_set(&reconnect_broadcast_send_timer, CLOCK_SECOND, &reconnect_broadcast_send_callback, NULL);
 					// End the sensor data process until we can reroute
 					process_exit(&sensor_data_sending_process);
@@ -1065,9 +1274,11 @@ PROCESS_THREAD(sensor_process_gateway, ev, data) {
 	// how much time has passed since we last received sensor data from each node.
 	// Indexes are shifted by 1 since gateway node does not send sensor data (index 0 is node 1)
 	sensordata_times = malloc((MAX_NODES - 1) * sizeof(unsigned int));
+	node_status_vals = malloc((MAX_NODES - 1) * sizeof(uint8_t));
 	// Initialize:
 	for(int i=0;i<num_total_nodes-1;i++){
 		sensordata_times[i] = clock_seconds();
+		node_status_vals[i] = 0; // 0 means a node is up and working as expected
 	}
 
 	// Print the prev_nodes array:

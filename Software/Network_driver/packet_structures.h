@@ -15,6 +15,7 @@ typedef struct{ // Packet Structure for discovery phase
 	uint8_t disc_type; // = 0 for initial network discovery,
 					// = 1 for subsequent beacon broadcasts to add new nodes to the established network.
 					// = 2 for the discovery broadcast of a newly added node (as a response to beacon)
+					 // = 9 for global reset
 }discovery_packet;
 
 typedef struct{ // Packet Structure for carrying the neighbor data to the gateway in routing phase
@@ -60,7 +61,8 @@ typedef struct{ // Packet Structure for routing phase
 					 // 2: Msg from nodes to the gateway that includes the sensor data
 					 // 3: Msg as a response to check msg or beacon broadcast after initial routing
 					 // 4: Msg to inform the neighbor node and the gateway about the newly added node
-					//  5: Msg to update the distance of a node to the gateway (used in failure recovery)
+					 // 5: Msg to update the distance of a node to the gateway (used in failure recovery)
+					 // 6: Msg to propagate the failure of a node to its children, after it also fails the failure recovery attempt (this type does not need a msg field)
 	union{
 		neighbor_data_packet n;
 		routing_paths_packet r;
