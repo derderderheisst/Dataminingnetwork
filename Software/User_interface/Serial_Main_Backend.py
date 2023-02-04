@@ -220,10 +220,15 @@ class Serial_Main_Backend(QMainWindow):
             sensordata_dict[sensordata1[0]] = sensordata1[1]
             if not ("src_addr" in sensordata1[0] or "src_id" in sensordata1[0]):
                 sensordata_cat_list.append(sensordata1[0])
+            else:
+                if "src_addr" in sensordata1[0]:
+                    current_sourceadress =  sensordata1[1]
         current_node_number = int(sensordata_dict["src_id"])
         current_node_widgets = self.get_node_widgets(current_node_number)
         if not(setted_combobox[current_node_number]):
             current_node_widgets[1].addItems(sensordata_cat_list)
+            current_strings = str("node :" + str(current_node_number) +"  "+ current_sourceadress)
+            current_node_widgets[0].setText(current_strings)
             setted_combobox[current_node_number] = True
         current_data = self.plot_data[current_node_number]
         current_curve = self.list_of_curves[current_node_number]
@@ -308,13 +313,14 @@ class Serial_Main_Backend(QMainWindow):
         #print(node_definitions)
         degree = 90
         radius = 10
+        a = 3
         for i in range(0, numberofnodes):
             if i == 0:
                 node_definitions.append((0 + 10 * i, i))
-            elif i> 4:
+            elif i> a:
                 radius = radius*1.5
-                x = radius * math.cos(math.radians(90-(20*i)))
-                y = radius * math.sin(math.radians(90-(20*i)))
+                x = radius * math.cos(math.radians(105-(30*(i-a))))
+                y = radius * math.sin(math.radians(105-(30*(i-a))))
                 node_definitions.append((x, y))
 
             else:
@@ -357,11 +363,10 @@ class Serial_Main_Backend(QMainWindow):
 
     def init_nodetxt(self):
         nodetxt = []
-        #print(self.src_adrlist)
-        #print(self.numberofnodes)
         for i in range(0, self.numberofnodes):
             nodetxt.append("Node " + str(i) + " : \n" + self.src_adrlist[i])
         return nodetxt
+
     def update_connect_button_texts(self):
         a = len(self.ui.nodes_widgets_generaL_list)
         nodes = self.ui.nodes_widgets_generaL_list

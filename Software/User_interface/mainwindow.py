@@ -74,6 +74,7 @@ class Ui_MainWindow(object):
         self.comboBox_nodenumbers.setEditable(False)
         self.comboBox_nodenumbers.setCurrentText("")
         self.comboBox_nodenumbers.setObjectName("comboBox_nodenumbers")
+        
         self.horizontalLayout_5.addWidget(self.comboBox_nodenumbers)
         self.verticalLayout_2.addLayout(self.horizontalLayout_5)
         self.horizontalLayout.addLayout(self.verticalLayout_2)
