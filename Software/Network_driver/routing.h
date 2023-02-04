@@ -71,7 +71,6 @@
 #define ALIVE_MAX_NODE_DELAY 5
 #endif
 
-
 // custom structures
 typedef struct
 {
