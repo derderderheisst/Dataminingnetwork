@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>group5</name>
+	<comment></comment>
+	<projects>
+		<project>1-Lesson</project>
+		<project>L1_First_App</project>
+	</projects>
+	<buildSpec>
+	</buildSpec>
+	<natures>
+	</natures>
+</projectDescription>

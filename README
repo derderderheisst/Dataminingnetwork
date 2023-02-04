@@ -1,0 +1,35 @@
+Wireless Sensor Networks Laboratory
+
+Technische Universität München
+Lehrstuhl für Kommunikationsnetze
+https://www.ei.tum.de/en/lkn 
+
+copyright (c) 2021 Chair of Communication Networks, TUM
+
+### Routing Application
+This application is designed to be used with zolertia re-mote. It consists of a routing.c file that must be flashed onto the remote device and a user interface (UI) that is used to control the networking process.
+
+To use the application, first open the MainWindow_file and run Main. When the start button is pressed, the application will indicate that it is ready for a connection. At this point, you should connect a mote to your target computer. Once the mote is connected, you can press the other button to begin the networking process.
+
+Please note that proper setup and configuration of the mote and remote device is required for the application to function correctly.
+
+### Getting Started
+Flash the routing.c file onto the zolertia re-mote device
+Open the MainWindow_file and run Main on your target computer
+Connect a mote to your target computer
+Press the start button on the UI and wait for the application to indicate that it is ready for a connection
+Press the other button to begin the networking process.
+
+
+### Prerequisites
+zolertia re-mote device
+Mote
+Target computer with the MainWindow_file
+Built With
+C Programming Language
+MainWindow_file for UI
+Authors
+Nick Zhou Oguzhan Zengin Samyuktha Sena Indrasena - Initial work
+Acknowledgments
+zolertia re-mote for providing the remote device
+Mote for providing the networking technology

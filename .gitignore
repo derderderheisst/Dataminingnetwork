@@ -1,0 +1,51 @@
+# Minimalistic list of files/extensions which are to be ignored by GIT 
+# when uploading exercises for the WSN lab.
+# For an exhaustive list, please check the gitignore file in Contiki's root directory.
+
+*.a
+*.bin
+*.map
+*.png
+*.log
+*.elf
+*.d
+*.ihex
+*.pyc
+*.redbee-econotag
+*.econotag 
+*.native
+*.z1
+*.minimal-net
+*.sky
+*.wismote
+*.esb
+*.avr-raven
+*.exp5438
+*.mbxxx
+*.win32
+*.apple2enh
+*.atarixl
+*.c128
+*.c64
+*.cc2538dk
+*.ev-aducrf101mkxz
+*.report
+summary
+*.summary
+*.faillog
+*.orig
+*~
+obj_*
+symbols.*
+*.ipynb
+Makefile.target
+
+# This sections is for general unwanted directories
+# (e.g. Eclipse's .settings or git's .git)
+.git/
+.settings/
+
+#qt
+*.pro.user
+build*Debug/
+build*Release/

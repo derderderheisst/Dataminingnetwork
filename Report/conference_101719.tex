@@ -1,0 +1,161 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Data Mining Network for Industry Systems}
+\author{\IEEEauthorblockN{Nick Zhou}
+\IEEEauthorblockA{\textit{Department of Electrical and Computer Engineering} \\
+\textit{Technical University of Munich }\\
+Munich, Germany \\
+Nick.zhou@tum.de}
+\and
+\IEEEauthorblockN{Oguzhan Zengin}
+\IEEEauthorblockA{\textit{Department of Electrical and Computer Engineering} \\
+\textit{Technical University of Munich }\\
+Munich, Germany \\
+@tum.de}
+\and
+\centerline
+\IEEEauthorblockN{Samyuktha Sena Indrasena}
+\IEEEauthorblockA{\textit{Department of Electrical and Computer Engineering} \\
+\textit{Technical University of Munich }\\
+Munich, Germany \\
+ge47wuw@mytum.de}
+}
+
+\maketitle
+
+\begin{abstract}
+The Wireless Sensor Networks(WSNs) application is designed to monitor critical parameters such as temperature, battery voltage, and vibrations of machines in industrial settings. The project's main objective is to develop a self-sustaining routing protocol that can handle the dynamic nature of industrial environments. The routing protocol is designed to be adaptive, with the ability to detect failures and add new nodes to the network with minimal human intervention. The routing protocol allows for greater flexibility and scalability in the sensor network, making it easy to configure and adapt to changing conditions. A graphical user interface (GUI) has also been developed to represent the sensor network layout and configuration visually. With an additional indication by the LEDs to monitor the node's status, it is easy for operators and maintenance personnel to understand and interpret the status of the sensors. The GUI also allows for easy monitoring and control of the sensor network, making it more user-friendly. By monitoring the critical parameters, we can help improve the industrial plant's overall efficiency, allows for the early detection of faults, and increases the productivity. Overall, this wireless sensor network project is designed to provide an efficient and cost-effective solution for monitoring critical parameters of machines in industrial environments. The self-sustaining routing protocol, GUI, and the easily deployable system makes it an ideal solution for remote monitoring and maintenance of machines.
+
+\end{abstract}
+
+\section{Introduction}
+Wireless Sensor Networks (WSNs) have gained considerable attention in recent years for their ability to monitor and collect data from various sources in different environments. In industrial settings, WSNs can be used to monitor critical parameters such as temperature, humidity, motion, and pressure. Early detection of potential issues with machines can help prevent costly breakdowns and improve overall efficiency \cite{b1}. While data mining has emerged as one of the most significant and fast-growing areas in all disciplines. The primary objective of data mining is its power to identify patterns in large volumes of data from multiple sources. Data mining is an essential tool for businesses to gain insights from data and make informed decisions \cite{b2}.\\ 
+Here, we present a solution where the combination of both these fields proves to be a boon in any industrial setup.
+The main objective of this project is to design and develop a wireless sensor network, including the routing protocol, the GUI, and the sensor nodes. The paper also discusses the challenges and potential applications of the system \cite{b3}.
+
+
+\subsection{Challenges Of Wireless Sensor Networks}\label{AA}
+\begin{itemize}
+    \item Scalability: As the number of sensor nodes in the network increases, the complexity of the network also increases. This can make it difficult to manage and maintain the network, particularly when it comes to adding new nodes or reconfiguring the network.
+    \item Maintenance: As the network is self-sustaining, the maintenance of the network is critical. This involves the replacement of batteries, troubleshooting of the nodes, and monitoring the health of the network.
+    \item Adaptability: The network should be adaptable to different types of sensor and machine. The routing protocol should be flexible enough to handle different types of data, and to handle different types of machines.
+    \item Limited power and bandwidth: Sensor nodes in the network have limited power and bandwidth, which can affect the transmission of data and limit the number of sensors that can be connected to the network.
+\end{itemize}
+
+\subsection{Design Goals of Wireless Sensor Networks}\label{AA}
+\begin{itemize}
+    \item Self-sustaining routing protocol: The network should have a routing protocol that can handle the dynamic nature of industrial environments, with the ability to detect failures and add new nodes to the network with minimal human intervention.
+    \item Scalability: The network should be able to handle a large number of sensor nodes, and it should be easy to add new nodes and reconfigure the network as needed.
+    \item User-friendly interface: The network should have a user-friendly interface, such as a graphical user interface (GUI) that makes it easy to understand and interpret the data.
+    \item Easy maintenance: The network should be easy to maintain, with simple troubleshooting and monitoring of the health of the network.
+\end{itemize}
+
+\section{Architecture}
+
+
+\begin{figure}
+  \includegraphics[width=8cm,height=6cm]{Hardware architecture.png}
+  \caption{Hardware Architecture}
+  \label{fig:hardware architecture}
+\end{figure}
+
+\subsection{Hardware Architecture}\label{AA}
+The system is equipped with Zolertia Re-Mote, and a few external sensors.The Re-Mote is a low-power wireless sensor node with a built-in microcontroller, radio transceiver, and a wide range of interfaces for connecting to various sensors and actuators. This allows for a wide range of sensing and control capabilities. As for the specific application is concerned the Re-Mote is equipped with onboard sensors for measuring temperature and battery voltage, as well as external sensors for measuring vibrations and a buzzer to give an indication when the value exceeds the threshold. Figure ~\ref{fig:hardware architecture}  describes the block diagram of the hardware architecture for the application.  The threshold levels can be set and adjusted according to the requirements of the specific industrial environment.
+
+\subsection{Software Architecture}\label{AA}
+The software architecture for this wireless sensor network project includes a gateway, which serves as the central point of communication and control for the network. The gateway is connected to both routing motes and sensory motes. Routing motes handle the routing of data within the network, while sensory motes are responsible for collecting data from various sensors. The system is designed to be flexible and adaptable, allowing for routing motes to also function as sensory motes, and vice versa. This allows for greater scalability and adaptability of the network, making it easy to add new nodes or reconfigure the network as needed. Figure ~\ref{fig:Architecture at Protocol Level} describes the overall software architecture at the protocol level of the system. In addition to which the graphical user interface (GUI) is used to control and manage the system, including the configuration of the layout, as well as displaying the data collected by the sensory motes. This allows for easy monitoring and control of the network, making it more user-friendly for operators and maintenance personnel.
+
+
+\begin{figure}
+  \includegraphics[width=8cm,height=6cm]{Software architecture.png}
+  \caption{Architecture at Protocol Level}
+  \label{fig:Architecture at Protocol Level}
+\end{figure}
+
+\section{Implementation}
+
+\subsection{Routing Algorithm}\label{AA}
+
+Each events have different purpose and can trigger different actions on the nodes, the network is designed to respond to these events in order to maintain its efficiency and reliability. The algorithm is divided into four main phases: Discovery, Routing, Sensor Data Sending, and Failure Recovery. The network is also designed to adapt to changes, such as the failure of a node or the addition of a new node. The gateway is the main node which is connected to the GUI and send serial data and monitors the network.
+The connection between the nodes in the network is setup in three different ways i.e., Unicast, Broadcast and Runicast.
+
+\begin{itemize}
+    \item Unicast : Unicast connection is used during the discovery phase. During the discovery phase, when a node receives a broadcast, and it responds back with a unicast response in which it sends its address. Unicast connection is also used by the network to discover a new node that has been added, as a response to the broadcast it receives.
+    \item Broadcast : A broadcast message is used during the node discovery phase. On receiving a broadcast message, the nodes respond to the same address to establish a connection with the parent node with the using the signal strength values. When a node receives a broadcast in discovery phase, a timer is set to add a randomized delay before rebroadcast to avoid collisions. Broadcast of beacons is also timed in order for a new node in the vicinity to identify the network and connect itself to the nearest neighbour.
+    \item Runicast : Runicast connection is used in case of routing phase and sensor data sending phase. During the routing phase, the node transmits its neighbours information to the parent node and further sends its neighbours data towards the gateway. Then during the sensor data transmit phase, the data from the sensor nodes are transmitted towards the gateway. In case of a node failure, runicast messages sent from the nodes help us with the identification of a potential failure, and further to reconfigure the optimal path.
+\end{itemize}
+
+There are four types of events that can trigger a node in the network, and they are button events, serial data events, timer events and data events. 
+\begin{figure}
+  \includegraphics[width=8cm,height=9cm]{Routing_final.png}
+  \caption{Routing Algorithm}
+  \label{fig:Routing Algorithm}
+\end{figure}
+\subsubsection{Discovery Phase}\label{AA}
+During the discovery phase, a wireless sensor network is established by configuring the communication channels for unicast and broadcast connections. This phase begins with the selection of a node as the gateway, which can be triggered by a physical button press. Once a gateway has been designated, it broadcasts a message to its immediate neighboring nodes to initiate the process of identifying itself and updating through all nodes in the network. \\
+The neighboring nodes, in turn, respond with a unicast message to establish a connection. This process continues until all nodes in the network have been identified and their connections has been established and updated. 
+
+\subsubsection{Routing Phase}\label{AA}
+The routing phase in the application utilizes runicast connections. During the routing phase, all nodes in the network transmit their neighbors table to the gateway through the connected neighbour. This approach guarantees that important information is preserved during transmission.
+In addition, it calculates the number of hops required to reach the gateway and the cost of reaching the gateway. This information is used to optimize the route for the routing of the sensor data in the network by the gateway and it updates all the nodes with its cost to reach the gateway information. Once the routing is established and the network is configured, sensor data can be transmitted.\\
+Using runicast connections and retransmitting messages ensures that important information is not lost during transmission. The calculation of hops and the cost of reaching the gateway allows for the optimization of the routing of sensor data. 
+
+\subsubsection{Sending Sensor Data Phase}\label{AA}
+The sensor data sending phase is an integral part of the wireless sensor network, and its primary function is to periodically transmit sensor data from individual nodes to the gateway. The sensor data includes various parameters such as temperature, battery voltage, and vibrations from machinery. The sensor data sending process starts by configuring the ADC (Analog-to-Digital Converter) port for the external vibration sensor.\\
+The process then sets up a timer that triggers the sending of sensor data to the gateway at regular intervals. In this specific implementation, the timer is set to trigger every two seconds.
+Once the timer expires, the sensor data is collected and packaged into a sensor data packet. This packet includes the sensor data and other relevant information, such as the node's ID, to ensure that the data can be properly processed and analyzed by the gateway.\\
+The sensor data packet is then transmitted to the gateway, where it is received and processed. The gateway, upon receiving the sensor data, analyses the values and gives an indication to the user by setting the buzzer.
+
+\subsubsection{Failure Detection and Recovery Phase}\label{AA}
+In the event of a failure detection and recovery phase, the network is capable of identifying a failed node through various means such as runicast timeout. Upon detection, an alert message is propagated to the gateway to inform of the failure. During the recovery phase, the remaining nodes in the network reroute their communications through available neighboring nodes to maintain network connectivity. This approach ensures the continuity of sensor data transmission and local recovery of the network.
+
+
+\subsubsection{Node Discovery and Addition Phase}\label{AA}
+The new node is added with the help of beacon messages. Every node in the network periodically sends a beacon broadcast message. When a new node enters the range of the network, it receives the beacon message and responds with a broadcast message to its neighboring nodes. The new node then calculates the cost of connecting to each node in the network by receiving unicast replies from its neighbors. It subsequently connects to the nearest neighbor and sends an indication of its addition to the connected node, which then forwards it to the gateway. This information is displayed on the user interface, providing real-time updates on the status of the network.\\
+This approach enables reliable and seamless integration of new nodes into the network without requiring manual configuration. Using beacon messages and cost calculation based on unicast replies ensures that new nodes connect to the optimal network and minimizes interruption to the existing network's operation. 
+
+\subsection{Graphical User Interface}\label{AA}
+This paper presents a user interface implemented using PyQT for monitoring and analyzing wireless sensor networks. The primary function of the user interface is to connect to gateway nodes and process the data received from connected devices. The interface utilizes PyQT Graph for generating network visualizations.
+The interface is organized into multiple tabs, with the first tab serving as a connection point for the gateway node. The tab displays status updates, warnings, connected devices, and the optimal routing path for the nodes as shown in figure ~\ref{fig:Visual Representation of the network layout}.\\
+\begin{figure}
+  \includegraphics[width=8cm,height=7cm]{Node_layout.png}
+  \caption{Visual Representation of the network layout}
+  \label{fig:Visual Representation of the network layout}
+\end{figure}
+
+The figure ~\ref{fig:Graphical representation of the measured parameters} shows the graphical representation of the other tab which is dedicated to displaying signal strength and the measured parameter for individual nodes using PyQT Graph. Users can select and display arbitrary data from a combo box and record data for logging purposes.
+
+\begin{figure}
+  \includegraphics[width=8cm,height=7cm]{capturedata.png}
+  \caption{Graphical representation of the measured parameters}
+  \label{fig:Graphical representation of the measured parameters}
+\end{figure}
+
+The interface design was chosen to demonstrate the general functions of wireless sensor networks in an easy-to-use and intuitive way. Overall, the user interface provides a powerful tool for monitoring and analyzing wireless sensor networks.
+
+\section{Results and Conclusion}
+The Wireless Sensor Network aimed to create an end-to-end, fully robust system for measuring ambient temperature, battery voltage, and vibration of machines in an industrial environment has been successfully implemented. A key component of the system is the development of the routing protocol and an interactive Graphical User Interface (GUI) that makes the system user-friendly. The GUI allows for easy monitoring and control of the sensor network, making it more accessible for operators and maintenance personnel.\\
+The system is also designed to be self-sustaining, with the ability to detect failures and add new nodes to the network with minimal human intervention. This allows for greater flexibility and scalability in the sensor network, making it easy to configure and adapt to changing conditions.\\
+In conclusion, this research project demonstrates the potential of wireless sensor networks for monitoring and maintaining industrial machines. The developed system has shown to be a reliable, efficient, and user-friendly solution for industrial applications. Future work could focus on further testing and implementation of the system in different industrial environments, as well as exploring additional features that could be added to the system to improve its performance.
+
+\section{Future scope}
+The future scope for a data mining network with a wireless sensor network for industrial setup is vast. With the current technology, it is possible to set up the network quickly and easily and integrate many different types of sensors. The network enables data to be collected and analyzed frequently, which can help industries improve their operations and efficiency. In the future, this technology can be further developed with automated data processing and analysis, machine learning algorithms for predictive analysis, AI-based solutions for optimizing operations, integration of industrial IoT devices, and combining wireless sensor networks with mobile technologies.
+
+\begin{thebibliography}{00}
+\bibitem{b1} O. Farooq, "Wireless Sensor Networks: Applications, Technologies and Challenges," IEEE, 2019.
+\bibitem{b2} Liao, T. W. , Chen, J. H. , and Triantaphyllou, E, "Data Mining Applications in Industrial Engineering: A Perspective," Proceedings of the 25th International Conference on Computers and Industrial Engineering, New Orleans, LA, 1999, pp. 265–276.
+\bibitem{b3} M. Imran, S.M. Khan, M. Ali, S.M. Iqbal, and M.Y. Zahid, “An Overview of Wireless Sensor Network Challenges and Security Issues,” Communications of the IIMA, vol. 6, no. 1, pp. 1–14, 2006.
+\end{thebibliography}
+
+\end{document}

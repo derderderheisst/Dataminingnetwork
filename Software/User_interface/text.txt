@@ -1,0 +1,60 @@
+Broadcast message sent.
+status:ndisc
+
+Unicast message received from 0xef24 [RSSI -47]
+
+Neighbors Table:
+___________________
+0x224:    RSSI: -47
+0xef24:    RSSI: -47
+
+
+Broadcast message received from 0xef24:[RSSI -44]
+Address is known !!!
+
+
+Routing phase started
+
+Gateway received neighbor table from 0xef24
+
+Neighbors Table:
+___________________
+Num neigh = 1
+0x2f7:    RSSI: -43
+
+
+routingdata:num_total_nodes = 2
+
+routingdata:adjmx
+0,76 
+76,0 
+
+
+routingdata:nodelist = 0x2f7,0xef24
+status:computing_dijkstra
+
+Distance from source to 1: 76
+Prev:
+0, 0, 
+status:sending_routes
+
+
+status:sensor_receive
+
+routingdata:prevnodes =0,0
+
+runicast message sent to successfully 239.36, retransmissions 1
+
+
+sensordata:src_addr = 0xef24
+sensordata:src_id = 1
+sensordata:temp = 25476
+sensordata:vibr = 18
+sensordata:mvolt = 3212
+
+
+sensordata:src_addr = 0xef24
+sensordata:src_id = 1
+sensordata:temp = 25476
+sensordata:vibr = 18
+sensordata:mvolt = 3209
