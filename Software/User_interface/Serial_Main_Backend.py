@@ -10,6 +10,7 @@ from PyQt5.QtGui import QTextCursor, QFont
 import serial
 import numpy as np
 import os
+import math
 import threading
 
 class SerialThread(QThread):
@@ -305,14 +306,22 @@ class Serial_Main_Backend(QMainWindow):
     def setup_node_pos(self, numberofnodes):
         node_definitions = []
         #print(node_definitions)
+        degree = 90
+        radius = 10
         for i in range(0, numberofnodes):
-            if i == 2:
+            if i == 0:
                 node_definitions.append((0 + 10 * i, i))
+            elif i> 4:
+                radius = radius*1.5
+                x = radius * math.cos(math.radians(90-(20*i)))
+                y = radius * math.sin(math.radians(90-(20*i)))
+                node_definitions.append((x, y))
+
             else:
-                if (i % 3) == 0:
-                    node_definitions.append((i * 10, 10 * i))
-                else:
-                    node_definitions.append((i, 0 + 10 * i))
+                x = radius * math.cos(math.radians(100-(30*i)))
+                y = radius * math.sin(math.radians(100-(30*i)))
+                node_definitions.append((x, y))
+
         return np.array(node_definitions, dtype=float)
 
     def init_nodesymbols(self):
@@ -323,26 +332,26 @@ class Serial_Main_Backend(QMainWindow):
 
     def init_nodecon(self,isnodedown=False,nodedown=0,isadjupadted=False):
         node_connections = []
-        for i in range(0, len(self.prevnodes)):
-            if isnodedown:
-                a = i
-                if i == nodedown:
-                    b = i
-                else:
+        if nodedown ==0:
+            for i in range(0, len(self.prevnodes)):
+                    a = i
                     b = int(self.prevnodes[i])
                     node_connections.append((a, b))
-            else:
-                a = i
-                b = int(self.prevnodes[i])
-                node_connections.append((a, b))
-        if isadjupadted:
-            for i in range(0,len(self.prevnodes)):
-                for a in range (0,len(self.prevnodes)):
-                    b = a
-                    if self.adj_arr[i][a] == 0:
-                        b=i
-                    else:
-                        node_connections.append((i,b))
+            if isadjupadted:
+                for i in range(0,len(self.prevnodes)):
+                    for a in range (0,len(self.prevnodes)):
+                        b = a
+                        if self.adj_arr[i][a] == 0:
+                            b=i
+                        else:
+                            node_connections.append((i,b))
+        else:
+            for i in range(0, len(self.nodesadj)):
+                if nodedown== self.nodesadj[i][0] or  nodedown== self.nodesadj[i][1]:
+                    node_connections.append((0,0))
+                else:
+                    node_connections.append((self.nodesadj[i][0],self.nodesadj[i][1]))
+
                     
         return np.array(node_connections)
 
