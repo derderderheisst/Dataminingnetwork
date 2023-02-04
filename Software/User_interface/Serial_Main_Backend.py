@@ -4,12 +4,32 @@ import serial.tools.list_ports
 from mainwindow import Ui_MainWindow
 import PyQt5.QtCore as QtCore
 from SerialConnection import Serial_Connection
-from PyQt5.QtCore import QIODevice
+from PyQt5.QtCore import QIODevice, QThread
 from PyQt5.QtSerialPort import QSerialPort, QSerialPort, QSerialPortInfo
 from PyQt5.QtGui import QTextCursor, QFont
 import serial
 import numpy as np
 import os
+import math
+import threading
+
+class SerialThread(QThread):
+    data_recieved = QtCore.pyqtSignal(str)
+
+    def __init__(self,serial):
+        self._serial = serial
+        message = "start\n"
+        self._serial.write(message.encode("utf-8"))
+        super().__init__()
+    def serial_send_reset(self):
+        message = "reset\n"
+        self._serial.write(message.encode("utf-8"))
+       
+    def run(self):
+        while True:
+            serialdata = self._serial.readAll().data().decode()
+            if serialdata:
+                self.data_recieved.emit(serialdata)
 
 class Serial_Main_Backend(QMainWindow):
     def __init__(self,apps):
@@ -43,6 +63,7 @@ class Serial_Main_Backend(QMainWindow):
         self.ui.label_current_warnings.setFont(QFont('Arial', 20))
         self.ui.label_Devices_available.setFont(QFont('Arial', 20))
         self.ui.pushButton_close.clicked.connect(self.ui.close_window)
+        self.ui.pushButton_reset.clicked.connect(self.serial_send_reset)
         self.ui.pushButton_Start.setDisabled(True)
         self.window.show()
 
@@ -74,6 +95,9 @@ class Serial_Main_Backend(QMainWindow):
             node = nodes[i]
             self.list_of_curves.append(node[5].plot(self.plot_data[i]))
 
+    def serial_send_reset(self):
+        message = "reset\n"
+        self._serial.write(message.encode("utf-8"))
 
     def serial_connect(self):
         # ’’’
@@ -92,11 +116,13 @@ class Serial_Main_Backend(QMainWindow):
             self._serial.setParity(QSerialPort.NoParity)
             self._serial.setStopBits(QSerialPort.OneStop)
             self._serial.setFlowControl(QSerialPort.NoFlowControl)
+            
             self._serial.readyRead.connect(self.read_serial)
             if self._serial.open(QIODevice.ReadWrite):
                 self.ui.textBrowser_statusMessages.append(f"Connected to port {port}")
                 self.send_data_serial()
                 self.set_all_connect_Button_to_Checkable()
+               
             else:
                 self.ui.textBrowser_statusMessages.append(f"Connection Failed")
                 self.ui.label_current_warnings.setText("could not connect to the main Gateway")           
@@ -105,15 +131,16 @@ class Serial_Main_Backend(QMainWindow):
             self._serial.close()
 
     def read_serial(self):
-        serialdata = self._serial.readAll().data().decode()
+        data = self._serial.readAll().data().decode()
         sys.stdout.flush()
-        self.dataprocessing(serialdata)
+        #print(data)
+        self.dataprocessing(data)
         sys.stdout.flush()
-        cursor = self.ui.textBrowser_statusMessages.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        #cursor = self.ui.textBrowser_statusMessages.textCursor()
+        #cursor.movePosition(QTextCursor.End)
         self.update_connect_button_texts()
-        cursor.insertText(serialdata)
-        self.ui.textBrowser_statusMessages.setTextCursor(cursor)
+        #cursor.insertText(data)
+        #self.ui.textBrowser_statusMessages.setTextCursor(cursor)
 
     def send_data_serial(self):
         # ’’’
@@ -156,7 +183,7 @@ class Serial_Main_Backend(QMainWindow):
             current_nodes[3].setCheckable(True)
 
     def dataprocessing(self, message1):
-        if "routingdata" in message1:
+        if not "sensordata" in message1:
             print("routing data",message1,"routing data end",flush=True)
         if "\n" in message1 and not "sensordata" in message1:
             message = message1.split("\n")
@@ -193,10 +220,15 @@ class Serial_Main_Backend(QMainWindow):
             sensordata_dict[sensordata1[0]] = sensordata1[1]
             if not ("src_addr" in sensordata1[0] or "src_id" in sensordata1[0]):
                 sensordata_cat_list.append(sensordata1[0])
+            else:
+                if "src_addr" in sensordata1[0]:
+                    current_sourceadress =  sensordata1[1]
         current_node_number = int(sensordata_dict["src_id"])
         current_node_widgets = self.get_node_widgets(current_node_number)
         if not(setted_combobox[current_node_number]):
             current_node_widgets[1].addItems(sensordata_cat_list)
+            current_strings = str("node :" + str(current_node_number) +"  "+ current_sourceadress)
+            current_node_widgets[0].setText(current_strings)
             setted_combobox[current_node_number] = True
         current_data = self.plot_data[current_node_number]
         current_curve = self.list_of_curves[current_node_number]
@@ -219,7 +251,7 @@ class Serial_Main_Backend(QMainWindow):
         #print("new Message", message)
         if "routingdata:num_total_nodes" in message:
             splitmessage = message.split(" = ")
-            print(splitmessage)
+            #print(splitmessage)
             self.numberofnodes = int(splitmessage[1])
             # print("eas",splitmessage[1])
             # self.ui.setup_nodes(2)
@@ -279,14 +311,23 @@ class Serial_Main_Backend(QMainWindow):
     def setup_node_pos(self, numberofnodes):
         node_definitions = []
         #print(node_definitions)
+        degree = 90
+        radius = 10
+        a = 3
         for i in range(0, numberofnodes):
-            if i == 2:
+            if i == 0:
                 node_definitions.append((0 + 10 * i, i))
+            elif i> a:
+                radius = radius*1.5
+                x = radius * math.cos(math.radians(105-(30*(i-a))))
+                y = radius * math.sin(math.radians(105-(30*(i-a))))
+                node_definitions.append((x, y))
+
             else:
-                if (i % 3) == 0:
-                    node_definitions.append((i * 10, 10 * i))
-                else:
-                    node_definitions.append((i, 0 + 10 * i))
+                x = radius * math.cos(math.radians(100-(30*i)))
+                y = radius * math.sin(math.radians(100-(30*i)))
+                node_definitions.append((x, y))
+
         return np.array(node_definitions, dtype=float)
 
     def init_nodesymbols(self):
@@ -297,36 +338,35 @@ class Serial_Main_Backend(QMainWindow):
 
     def init_nodecon(self,isnodedown=False,nodedown=0,isadjupadted=False):
         node_connections = []
-        for i in range(0, self.numberofnodes):
-            if isnodedown:
-                a = i
-                if i == nodedown:
-                    b = i
-                else:
+        if nodedown ==0:
+            for i in range(0, len(self.prevnodes)):
+                    a = i
                     b = int(self.prevnodes[i])
                     node_connections.append((a, b))
-            else:
-                a = i
-                b = int(self.prevnodes[i])
-                node_connections.append((a, b))
-        if isadjupadted:
-            for i in range(0,self.numberofnodes):
-                for a in range (0,self.numberofnodes):
-                    b = a
-                    if self.adj_arr[i][a] == 0:
-                        b=i
-                    else:
-                        node_connections.append((i,b))
+            if isadjupadted:
+                for i in range(0,len(self.prevnodes)):
+                    for a in range (0,len(self.prevnodes)):
+                        b = a
+                        if self.adj_arr[i][a] == 0:
+                            b=i
+                        else:
+                            node_connections.append((i,b))
+        else:
+            for i in range(0, len(self.nodesadj)):
+                if nodedown== self.nodesadj[i][0] or  nodedown== self.nodesadj[i][1]:
+                    node_connections.append((0,0))
+                else:
+                    node_connections.append((self.nodesadj[i][0],self.nodesadj[i][1]))
+
                     
         return np.array(node_connections)
 
     def init_nodetxt(self):
         nodetxt = []
-        #print(self.src_adrlist)
-        #print(self.numberofnodes)
         for i in range(0, self.numberofnodes):
             nodetxt.append("Node " + str(i) + " : \n" + self.src_adrlist[i])
         return nodetxt
+
     def update_connect_button_texts(self):
         a = len(self.ui.nodes_widgets_generaL_list)
         nodes = self.ui.nodes_widgets_generaL_list
@@ -342,7 +382,7 @@ class Serial_Main_Backend(QMainWindow):
                 current_node_widget[3].setText("Start Recording")
 
     def addNodelines(self):
-        print("nodeadj",len(self.nodesadj))
+        #print("nodeadj",len(self.nodesadj))
         linelist = []
         for i in range(0,len(self.nodesadj)):
             if i <= self.numberofnodes:

@@ -74,6 +74,7 @@ class Ui_MainWindow(object):
         self.comboBox_nodenumbers.setEditable(False)
         self.comboBox_nodenumbers.setCurrentText("")
         self.comboBox_nodenumbers.setObjectName("comboBox_nodenumbers")
+        
         self.horizontalLayout_5.addWidget(self.comboBox_nodenumbers)
         self.verticalLayout_2.addLayout(self.horizontalLayout_5)
         self.horizontalLayout.addLayout(self.verticalLayout_2)
@@ -96,9 +97,14 @@ class Ui_MainWindow(object):
         self.textBrowser_statusMessages.setMinimumSize(QtCore.QSize(0, 70))
         self.textBrowser_statusMessages.setObjectName("textBrowser_statusMessages")
         self.verticalLayout.addWidget(self.textBrowser_statusMessages)
+        self.pushButton_reset = QtWidgets.QPushButton(self.horizontalLayoutWidget)
+        self.pushButton_reset.setObjectName("pushButton_reset")
+        self.pushButton_reset.setText("reset Network")
+        self.verticalLayout.addWidget(self.pushButton_reset)
         self.pushButton_close = QtWidgets.QPushButton(self.horizontalLayoutWidget)
         self.pushButton_close.setObjectName("pushButton_close")
         self.verticalLayout.addWidget(self.pushButton_close)
+
         self.horizontalLayout.addLayout(self.verticalLayout)
         self.tabWidget.addTab(self.tab_1, "")
 
