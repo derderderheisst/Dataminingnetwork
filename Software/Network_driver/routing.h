@@ -56,9 +56,9 @@
 #define MAX_HOPS 10
 #endif
 
-// the maximum number of hops for a routing or control packet in the network
+// the maximum number of retransmissions for runicast messages in the network
 #ifndef RUNICAST_MAX_RETRANSMIT
-#define RUNICAST_MAX_RETRANSMIT 2
+#define RUNICAST_MAX_RETRANSMIT 3
 #endif
 
 // the minimum rssi between 2 nodes for them to be considered neighbors in the network
